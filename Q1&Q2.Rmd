@@ -1,0 +1,260 @@
+---
+title: "HW3 - Q1&Q2"
+author: "Zining Fan(zf2234), Mutian Wang(mw3386), Siyuan Wang(sw3418)"
+date: "4/16/2020"
+output: pdf_document
+---
+Exercise 1:
+
+Question 1:
+```{r}
+options(scipen=999)
+```
+```{r}
+library("readxl")
+milk <- read_excel("/Users/wangsiyuan/1-Columbia/2020Spring/inference_estimation/hw3/milk.xls")
+```
+We import the data after transforming the month into time point variable. Each number represent a month in a sequential order.
+
+```{r}
+model <- lm(formula = milk_production ~ time, data = milk)
+```
+```{r}
+print(model)
+```
+We can observe the trend from the coefficient that when month lied before 1962, the average monthly milk production is 611.682, and after that, when one month passed, the average milk production will increase by 1.693 pounds per cow on average.
+```{r}
+summary(model)
+```
+It can be deduced from the summary of the model that the p value of the coefficient is small enough so we can reject the hypothesis that the coefficients are zeros.
+
+We calculate the residuals and plot the curve on time.
+
+```{r}
+milk_res <- read_excel("/Users/wangsiyuan/1-Columbia/2020Spring/inference_estimation/hw3/milk_res.xls")
+plot(1:168,(milk_res$residual),type = "l", xlab = "time",ylab = "residual" )
+```
+
+We can clearly see a seasonal structure in the residual of the model.
+
+
+
+Question 2:
+```{r}
+acf(milk_res$residual)
+```
+```{r}
+pacf(milk_res$residual)
+```
+We can observe systematic departure in the correlogram,it's definitely not white noise.
+We must try different model to remove the seasonality and try fitting them with different autoregressive models.
+
+Question 3:
+Firstly, we try with AR(1) model.
+```{r}
+AR_1 <- arima(milk_res$residual,order = c(1,0,0))
+print(AR_1)
+```
+Here we finish fitting the AR(1) model.
+We wil try to plot the noew residual and compare with the results in Question 2.
+
+```{r}
+acf(residuals(AR_1))
+```
+```{r}
+pacf(residuals(AR_1))
+```
+Compared to the results in the linear regression model, the autocorrelation seems to be less intensive. So we believe it's more close to the stationary status and does provide a better model.
+
+```{r}
+AR_2 <- arima(milk_res$residual,order = c(2,0,0))
+print(AR_2)
+```
+```{r}
+MA_1 <- arima(milk_res$residual, order = c(0,0,1))
+print(MA_1)
+```
+```{r}
+MA_2 <- arima(milk_res$residual, order = c(0,0,2))
+print(MA_2)
+```
+After comparing the AIC score, we can see that MA(2) model give a low value among these models. It can be considered relatively lower.
+
+Question 4
+We can try different ARMA model. It require us to try different p and q value in the autoregressive moving average modeling process.
+We can try p=1,2 and q= 1,2, which requre us to try 4 models.
+```{r}
+ARMA_1 = arima(milk_res$residual, order = c(1,0,1))
+print(ARMA_1)
+```
+```{r}
+ARMA_2 = arima(milk_res$residual, order = c(1,0,2))
+print(ARMA_2)
+```
+```{r}
+ARMA_3 = arima(milk_res$residual, order = c(2,0,1))
+print(ARMA_3)
+```
+
+```{r}
+ARMA_4 = arima(milk_res$residual, order = c(2,0,2))
+print(ARMA_4)
+```
+Just judging by the AIC score, the ARMA(2,2) model has the best performace. Also the ARMA(1,2) model has a relatively low ARMA score whose perfomance is fairly close to that of ARMA(2,2).
+
+
+Exercise 2:
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Question 1:
+```{r}
+df <- cars
+```
+```{r}
+df$speed_2 <- df$speed*df$speed
+```
+
+```{r}
+model <- lm(formula = dist ~ speed+speed_2, data = df)
+summary(model)
+```
+If we judged by the hypothesis testing methods, we can see that the p values of all the terms are not small enough for us to reject the null hypothesis.
+We now explore them with AIC methods.
+```{r}
+AIC(model)
+```
+
+```{r}
+model_1 <- lm(formula = dist ~ 1, data = df)
+model_2 <- lm(formula = dist ~ speed, data = df)
+model_3 <- lm(formula = dist ~ speed_2, data = df)
+model_4 <- lm(formula = dist ~ speed+speed_2, data = df)
+model_5 <- lm(formula = dist ~ 0+speed, data = df)
+model_6 <- lm(formula = dist ~ 0+speed_2, data = df)
+model_7 <- lm(formula = dist ~ 0+speed+speed_2, data = df)
+```
+```{r}
+print(AIC(model_1))
+print(AIC(model_2))
+print(AIC(model_3))
+print(AIC(model_4))
+print(AIC(model_5))
+print(AIC(model_6))
+print(AIC(model_7))
+```
+We can now observed that model_7 has the smallest AIC value. So the most appropriate model is to throw away the intercept term and keep speed and square of speed.
+
+Question 2:
+Based on the selected model from Question 1, we now observe the parameters from model_7.
+```{r}
+summary(model_7)
+```
+So the esimate of the speed term represent the reaction time of the driver, which is 1.23903 s.
+
+
+
+Question 3:
+```{r}
+library(pracma)
+QR_ls <- function(y,X) {
+  qrx <- qr(X)
+  Q <- qr.Q(qrx,complete=TRUE)
+  R <- qr.R(qrx)
+  R_inv <- inv(R)
+  p <- ncol(X)
+  f_raw <- t(Q) %*% y
+  f <- head(f_raw,p)
+  return(R_inv %*% f)
+}
+```
+Here we finish writing the R function.
+
+
+
+Question 4:
+```{r}
+X <- model.matrix(dist ~speed + I(speed^2),cars)
+y <- cars$dist
+QR_ls(y,X)
+```
+```{r}
+model <- lm(formula = dist ~ speed+speed_2, data = df)
+print(model)
+```
+Here we see that the result of QR decomposition method is exactly the same as those from the lm function. Our answer is validated.
+
+
+Question 5:
+
+```{r}
+summary(model)
+```
+
+```{r}
+library(pracma)
+QR_se <- function(y,X) {
+  qrx <- qr(X)
+  Q <- qr.Q(qrx,complete=TRUE)
+  R <- qr.R(qrx)
+  R_inv <- inv(R)
+  p <- ncol(X)
+  n <- nrow(X)
+  f_raw <- t(Q) %*% y
+  f <- head(f_raw,p)
+  r <- tail(f_raw,n-p)
+  beta <- R_inv %*% f
+  sigma_2 <- Norm(r,p=2)**2/(n-p)
+  se_beta <- (R_inv %*% t(R_inv))*sigma_2
+  return(sqrt(diag(se_beta)))
+}
+QR_sigma <- function(y,X) {
+  qrx <- qr(X)
+  Q <- qr.Q(qrx,complete=TRUE)
+  R <- qr.R(qrx)
+  R_inv <- inv(R)
+  p <- ncol(X)
+  n <- nrow(X)
+  f_raw <- t(Q) %*% y
+  f <- head(f_raw,p)
+  r <- tail(f_raw,n-p)
+  sigma_2 <- Norm(r,p=2)**2/(n-p)
+  return(sigma_2)
+}
+QR_beta <- function(y,X) {
+  qrx <- qr(X)
+  Q <- qr.Q(qrx,complete=TRUE)
+  R <- qr.R(qrx)
+  R_inv <- inv(R)
+  p <- ncol(X)
+  n <- nrow(X)
+  f_raw <- t(Q) %*% y
+  f <- head(f_raw,p)
+  r <- tail(f_raw,n-p)
+  beta <- R_inv %*% f
+  return(beta)
+}
+```
+
+```{r}
+X <- model.matrix(dist ~speed + I(speed^2),cars)
+y <- cars$dist
+print("coefficient")
+print(QR_beta(y,X))
+print("estimated residual variance")
+print(QR_sigma(y,X))
+print("standard error of parameter estimators")
+print(QR_se(y,X))
+```
+Here we can see that our function produce the same results from the lm.
+
+Question 6:
+```{r}
+q <- QR_beta(y,X)/QR_se(y,X)
+n <- nrow(X)
+p <- ncol(X)
+print(2*pt(q, n-p, lower.tail = FALSE))
+```
+Here we produce the same results as those from the lm function.
+
